@@ -1,15 +1,55 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Zap, ArrowRight, Github, ShieldCheck } from 'lucide-react';
 
+
 export default function RegisterPage() {
+  // State za prikupljanje podataka iz forme
+  const [formData, setFormData] = useState({
+    name: '',
+    surname: '',
+    email: '',
+    number: '',
+    company_name: '',
+    password: ''
+  });
+
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const handleSubmit = async (e) => {
+  e.preventDefault();
+  
+  // Čitamo URL iz enviroment varijabli
+  const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
+  try {
+    const response = await fetch(`${API_URL}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formData),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      window.location.href = '/login'; 
+      console.log("Uspješna registracija:", data);
+    }
+  } catch (error) {
+    console.error("Mrežna greška:", error);
+  }
+};
+
+  
+
   return (
     <div className="min-h-screen bg-[#020408] text-white flex flex-col justify-center items-center px-6 py-20 font-sans">
       
-      {/* Logo / Back to Home */}
+      {/* Logo */}
       <Link href="/" className="absolute top-12 left-12 flex items-center gap-2 group">
         <div className="bg-zinc-900 p-2 rounded border border-zinc-800 group-hover:border-[#00F5D4] transition-colors">
           <Zap size={18} className="text-white" fill="white" />
@@ -20,7 +60,7 @@ export default function RegisterPage() {
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-[450px]"
+        className="w-full max-w-[480px]"
       >
         {/* Header */}
         <div className="text-center mb-10">
@@ -33,48 +73,76 @@ export default function RegisterPage() {
         </div>
 
         {/* Register Form */}
-        <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+        <form className="space-y-4" onSubmit={handleSubmit}>
+          
+          {/* Ime i Prezime */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 ml-1">
-                Full Name
-              </label>
+              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 ml-1">Name</label>
               <input 
+                name="name"
                 type="text" 
-                placeholder="John Doe"
+                onChange={handleChange}
+                placeholder="John"
                 className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#00F5D4] transition-colors placeholder:text-zinc-700 font-medium"
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 ml-1">
-                Company Name
-              </label>
+              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 ml-1">Surname</label>
               <input 
+                name="surname"
                 type="text" 
+                onChange={handleChange}
+                placeholder="Doe"
+                className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#00F5D4] transition-colors placeholder:text-zinc-700 font-medium"
+              />
+            </div>
+          </div>
+
+          {/* Broj telefona i Firma */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 ml-1">Phone Number</label>
+              <input 
+                name="number"
+                type="number" 
+                onChange={handleChange}
+                placeholder="38761234567"
+                className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#00F5D4] transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-zinc-700 font-medium"
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 ml-1">Company</label>
+              <input 
+                name="company_name"
+                type="text" 
+                onChange={handleChange}
                 placeholder="TechFlow Inc."
                 className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#00F5D4] transition-colors placeholder:text-zinc-700 font-medium"
               />
             </div>
           </div>
 
+          {/* Email */}
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 ml-1">
-              Work Email
-            </label>
+            <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 ml-1">Work Email</label>
             <input 
+              name="email"
               type="email" 
+              onChange={handleChange}
               placeholder="john@company.com"
               className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#00F5D4] transition-colors placeholder:text-zinc-700 font-medium"
             />
           </div>
 
+          {/* Password */}
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 ml-1">
-              Password
-            </label>
+            <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 ml-1">Password</label>
             <input 
+              name="password"
               type="password" 
-              placeholder="Min. 8 characters"
+              onChange={handleChange}
+              placeholder="••••••••"
               className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#00F5D4] transition-colors placeholder:text-zinc-700 font-medium"
             />
           </div>
@@ -86,12 +154,15 @@ export default function RegisterPage() {
              </p>
           </div>
 
-          <button className="w-full mt-4 py-4 rounded-xl bg-gradient-to-r from-[#00F5D4] to-[#00A8FF] text-black font-bold uppercase font-['Syne'] text-sm shadow-[0_0_25px_rgba(0,245,212,0.25)] hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+          <button 
+            type="submit"
+            className="w-full mt-4 py-4 rounded-xl bg-gradient-to-r from-[#00F5D4] to-[#00A8FF] text-black font-bold uppercase font-['Syne'] text-sm shadow-[0_0_25px_rgba(0,245,212,0.25)] hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+          >
             Create Account <ArrowRight size={18} />
           </button>
         </form>
 
-        {/* Social Register */}
+        {/* Divider */}
         <div className="relative my-8 text-center">
           <div className="absolute inset-0 flex items-center">
             <div className="w-full border-t border-zinc-900"></div>
@@ -105,7 +176,6 @@ export default function RegisterPage() {
           <Github size={18} /> Sign up with GitHub
         </button>
 
-        {/* Footer Link */}
         <p className="mt-8 text-center text-zinc-500 text-xs uppercase tracking-tighter">
           Already a member? {' '}
           <Link href="/login" className="text-white font-bold hover:text-[#00F5D4] transition-colors">
