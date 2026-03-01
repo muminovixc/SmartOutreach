@@ -13,3 +13,7 @@ class LeadCreate(BaseModel):
 class LeadResponse(LeadCreate):
     id: str
     status: str
+
+class CompanyRequest(BaseModel):
+    company_name: str 
+    city: Optional[str] = None

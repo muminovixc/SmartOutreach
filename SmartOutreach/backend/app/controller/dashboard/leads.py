@@ -4,9 +4,14 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models.leads import SavedLead
 from app.schemas.leads import LeadCreate
+from app.schemas.leads import CompanyRequest
+import google.generativeai as genai
+import os
 
 
 router = APIRouter(prefix="/leads", tags=["Leads"])
+genai.configure(api_key=os.environ.get("GEMINI_KEY"))  # Postavi GEMINI_KEY iz .env datoteke
+
 
 @router.get("/search")
 async def get_leads(niche: str, city: str):
@@ -74,3 +79,41 @@ async def delete_lead(lead_id: str, db: Session = Depends(get_db)):
     db.delete(lead)
     db.commit()
     return {"status": "success", "message": "Lead deleted"}
+
+# app/controller/dashboard/leads.py
+@router.post("/find-linkedin")
+async def find_linkedin_link(request: CompanyRequest):
+    try:
+        # Koristimo stabilniji model name
+        model = genai.GenerativeModel("gemini-2.5-flash")
+        
+        # Ažurirani prompt koji uključuje grad za preciznost
+        prompt = (
+            f"Find the official LinkedIn company page for the company '{request.company_name}' "
+            f"located in {request.city}. "
+            "IMPORTANT: It must be the specific branch or the main office in that region. "
+            "Return ONLY the direct URL (starting with https://www.linkedin.com/company/). "
+            "If you are not 100% sure or cannot find it, return 'no link'."
+        )
+
+        response = model.generate_content(prompt)
+        
+        if not response or not response.text:
+            return {"status": "error", "linkedin_url": "no link"}
+
+        url = response.text.strip()
+        print(f"DEBUG: Gemini response for '{request.company_name}': {url}")  # Debug: provjeri što Gemini vraća
+        
+        # Čišćenje URL-a u slučaju da Gemini doda markdown (npr. [link](url))
+        clean_url = url.replace("`", "").replace("[", "").replace("]", "")
+        if "(" in clean_url and ")" in clean_url:
+            clean_url = clean_url.split("(")[-1].split(")")
+
+        if "linkedin.com/company/" in clean_url:
+            return {"status": "success", "linkedin_url": clean_url}
+        
+        return {"status": "error", "linkedin_url": "no link"}
+
+    except Exception as e:
+        print(f"DEBUG: Greška kod Gemini-ja: {e}")
+        return {"status": "error", "linkedin_url": "no link"}
