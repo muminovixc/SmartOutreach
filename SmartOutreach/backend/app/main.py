@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 # Importuj bazu i rutere (prilagodi putanje tvojoj strukturi foldera)
 from .db.session import engine, Base
 from .controller.auth import router as auth_router
+from .controller.dashboard.leads import router as leads_router
 
 # 1. Učitaj enviroment varijable iz .env fajla
 load_dotenv()
@@ -37,5 +38,6 @@ app.add_middleware(
 )
 
 
-app.include_router(auth_router) 
+app.include_router(auth_router)  
+app.include_router(leads_router) 
 

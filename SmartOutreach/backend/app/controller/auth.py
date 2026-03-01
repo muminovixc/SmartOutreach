@@ -32,9 +32,19 @@ def login(login_data: UserLogin, db: Session = Depends(get_db)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Pogrešan email ili lozinka",
         )
+    print("Authenticated user:", user)  # Debug: provjeri koji korisnik je autentificiran
     
-    access_token = create_access_token(data={"sub": user.email})
-    return {"access_token": access_token, "token_type": "bearer"}
+    access_token = create_access_token(
+    data={
+        "sub": str(user.id),  # UUID pretvoren u string
+        "email": user.email   # Opciono, ako ti treba i email
+    }
+)
+    return {
+    "access_token": access_token, 
+    "token_type": "bearer",
+    "user_id": str(user.id)  
+}
 
 
 

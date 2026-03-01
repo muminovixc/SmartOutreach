@@ -25,9 +25,13 @@ export default function LoginPage() {
 
       const data = await response.json();
 
+
       if (response.ok) {
+        console.log("Login successful:", data);
+
         // Spremi token u localStorage (ili bolje u Cookies)
         localStorage.setItem('token', data.access_token);
+        localStorage.setItem('user_id', data.user_id);
         router.push('/dashboard'); // Prebaci ga na dashboard
       } else {
         setError(data.detail || 'Login failed');
