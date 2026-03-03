@@ -9,6 +9,7 @@ import {
   Trash2,
   Linkedin,
   Search,
+  Send,
 } from "lucide-react";
 import { motion } from "framer-motion";
 
@@ -137,28 +138,15 @@ export default function LeadCard({
           </a>
         )}
 
-        {/* LINKEDIN DUGME - Sada se ponaša kao Action Button ako nema linka */}
         <button
-          onClick={handleLinkedinClick}
-          disabled={searchingLinkedin}
-          className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all ${
-            linkedinUrl
-              ? "bg-[#0077B5]/20 text-[#0077B5] hover:bg-[#0077B5]/30"
-              : "bg-zinc-800/50 text-zinc-400 hover:bg-zinc-700 hover:text-white"
-          }`}
+          onClick={() => {
+            const subject = encodeURIComponent(`Interested in ${lead.title}`);
+            window.location.href = `mailto:?subject=${subject}`;
+          }}
+          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#00F5D4]/10 to-[#00F5D4]/5 hover:from-[#00F5D4]/20 hover:to-[#00F5D4]/15 text-[#00F5D4] border border-[#00F5D4]/30 hover:border-[#00F5D4]/60 rounded-xl text-[11px] font-bold uppercase tracking-widest transition-all duration-300"
         >
-          {searchingLinkedin ? (
-            <Loader2 size={14} className="animate-spin" />
-          ) : linkedinUrl ? (
-            <Linkedin size={14} fill="#0077B5" className="text-[#0077B5]" />
-          ) : (
-            <Search size={14} />
-          )}
-          {searchingLinkedin
-            ? "Tražim..."
-            : linkedinUrl
-              ? "LinkedIn"
-              : "Nađi LinkedIn"}
+          <Send size={13} /> Reach Out
+    
         </button>
 
         {lead.phone && lead.phone !== "No phone" && (
