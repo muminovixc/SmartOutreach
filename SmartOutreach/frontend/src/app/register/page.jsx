@@ -1,20 +1,19 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { Zap, ArrowRight, Github, ShieldCheck } from 'lucide-react';
-
+import React, { useEffect, useState } from "react";
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { Zap, ArrowRight, Github, ShieldCheck, Mail } from "lucide-react";
 
 export default function RegisterPage() {
   // State za prikupljanje podataka iz forme
   const [formData, setFormData] = useState({
-    name: '',
-    surname: '',
-    email: '',
-    number: '',
-    company_name: '',
-    password: ''
+    name: "",
+    surname: "",
+    email: "",
+    number: "",
+    company_name: "",
+    password: "",
   });
 
   const handleChange = (e) => {
@@ -22,42 +21,44 @@ export default function RegisterPage() {
   };
 
   const handleSubmit = async (e) => {
-  e.preventDefault();
-  
-  // Čitamo URL iz enviroment varijabli
-  const API_URL = process.env.NEXT_PUBLIC_API_URL;
+    e.preventDefault();
 
-  try {
-    const response = await fetch(`${API_URL}/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData),
-    });
+    // Čitamo URL iz enviroment varijabli
+    const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-    if (response.ok) {
-      const data = await response.json();
-      window.location.href = '/login'; 
-      console.log("Uspješna registracija:", data);
+    try {
+      const response = await fetch(`${API_URL}/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        window.location.href = "/login";
+        console.log("Uspješna registracija:", data);
+      }
+    } catch (error) {
+      console.error("Mrežna greška:", error);
     }
-  } catch (error) {
-    console.error("Mrežna greška:", error);
-  }
-};
-
-  
+  };
 
   return (
     <div className="min-h-screen bg-[#020408] text-white flex flex-col justify-center items-center px-6 py-20 font-sans">
-      
       {/* Logo */}
-      <Link href="/" className="absolute top-12 left-12 flex items-center gap-2 group">
+      <Link
+        href="/"
+        className="absolute top-12 left-12 flex items-center gap-2 group"
+      >
         <div className="bg-zinc-900 p-2 rounded border border-zinc-800 group-hover:border-[#00F5D4] transition-colors">
           <Zap size={18} className="text-white" fill="white" />
         </div>
-        <span className="font-['Syne'] font-bold uppercase tracking-tighter text-sm italic">SmartReach AI</span>
+        <span className="font-['Syne'] font-bold uppercase tracking-tighter text-sm italic">
+          SmartReach AI
+        </span>
       </Link>
 
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-[480px]"
@@ -74,24 +75,27 @@ export default function RegisterPage() {
 
         {/* Register Form */}
         <form className="space-y-4" onSubmit={handleSubmit}>
-          
           {/* Ime i Prezime */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 ml-1">Name</label>
-              <input 
+              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 ml-1">
+                Name
+              </label>
+              <input
                 name="name"
-                type="text" 
+                type="text"
                 onChange={handleChange}
                 placeholder="John"
                 className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#00F5D4] transition-colors placeholder:text-zinc-700 font-medium"
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 ml-1">Surname</label>
-              <input 
+              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 ml-1">
+                Surname
+              </label>
+              <input
                 name="surname"
-                type="text" 
+                type="text"
                 onChange={handleChange}
                 placeholder="Doe"
                 className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#00F5D4] transition-colors placeholder:text-zinc-700 font-medium"
@@ -102,20 +106,24 @@ export default function RegisterPage() {
           {/* Broj telefona i Firma */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 ml-1">Phone Number</label>
-              <input 
+              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 ml-1">
+                Phone Number
+              </label>
+              <input
                 name="number"
-                type="number" 
+                type="number"
                 onChange={handleChange}
                 placeholder="38761234567"
                 className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#00F5D4] transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none placeholder:text-zinc-700 font-medium"
               />
             </div>
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 ml-1">Company</label>
-              <input 
+              <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 ml-1">
+                Company
+              </label>
+              <input
                 name="company_name"
-                type="text" 
+                type="text"
                 onChange={handleChange}
                 placeholder="TechFlow Inc."
                 className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#00F5D4] transition-colors placeholder:text-zinc-700 font-medium"
@@ -125,10 +133,12 @@ export default function RegisterPage() {
 
           {/* Email */}
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 ml-1">Work Email</label>
-            <input 
+            <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 ml-1">
+              Work Email
+            </label>
+            <input
               name="email"
-              type="email" 
+              type="email"
               onChange={handleChange}
               placeholder="john@company.com"
               className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#00F5D4] transition-colors placeholder:text-zinc-700 font-medium"
@@ -137,10 +147,12 @@ export default function RegisterPage() {
 
           {/* Password */}
           <div>
-            <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 ml-1">Password</label>
-            <input 
+            <label className="block text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 mb-2 ml-1">
+              Password
+            </label>
+            <input
               name="password"
-              type="password" 
+              type="password"
               onChange={handleChange}
               placeholder="••••••••"
               className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-[#00F5D4] transition-colors placeholder:text-zinc-700 font-medium"
@@ -148,13 +160,21 @@ export default function RegisterPage() {
           </div>
 
           <div className="flex items-start gap-3 py-2 px-1">
-             <ShieldCheck size={16} className="text-[#00F5D4] mt-0.5" />
-             <p className="text-[10px] text-zinc-500 leading-relaxed uppercase tracking-tighter">
-                By signing up, you agree to our <span className="text-zinc-300 underline cursor-pointer">Terms</span> and our data processing <span className="text-zinc-300 underline cursor-pointer">Security Protocol</span>.
-             </p>
+            <ShieldCheck size={16} className="text-[#00F5D4] mt-0.5" />
+            <p className="text-[10px] text-zinc-500 leading-relaxed uppercase tracking-tighter">
+              By signing up, you agree to our{" "}
+              <span className="text-zinc-300 underline cursor-pointer">
+                Terms
+              </span>{" "}
+              and our data processing{" "}
+              <span className="text-zinc-300 underline cursor-pointer">
+                Security Protocol
+              </span>
+              .
+            </p>
           </div>
 
-          <button 
+          <button
             type="submit"
             className="w-full mt-4 py-4 rounded-xl bg-gradient-to-r from-[#00F5D4] to-[#00A8FF] text-black font-bold uppercase font-['Syne'] text-sm shadow-[0_0_25px_rgba(0,245,212,0.25)] hover:scale-[1.01] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
           >
@@ -172,13 +192,39 @@ export default function RegisterPage() {
           </span>
         </div>
 
-        <button className="w-full py-3 rounded-xl border border-zinc-800 bg-zinc-900/20 text-white font-semibold text-sm hover:bg-zinc-800 transition-colors flex items-center justify-center gap-3">
-          <Github size={18} /> Sign up with GitHub
+        <button
+          onClick={() =>
+            (window.location.href = `${process.env.NEXT_PUBLIC_API_URL}/auth/google/login`)
+          }
+          className="w-full py-3 rounded-xl border border-zinc-800 bg-zinc-900/20 text-white font-semibold text-sm hover:bg-zinc-800 transition-colors flex items-center justify-center gap-3"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24">
+            <path
+              fill="currentColor"
+              d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+            />
+            <path
+              fill="currentColor"
+              d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+            />
+            <path
+              fill="currentColor"
+              d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+            />
+            <path
+              fill="currentColor"
+              d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+            />
+          </svg>
+          Continue with Google
         </button>
 
         <p className="mt-8 text-center text-zinc-500 text-xs uppercase tracking-tighter">
-          Already a member? {' '}
-          <Link href="/login" className="text-white font-bold hover:text-[#00F5D4] transition-colors">
+          Already a member?{" "}
+          <Link
+            href="/login"
+            className="text-white font-bold hover:text-[#00F5D4] transition-colors"
+          >
             Login here
           </Link>
         </p>

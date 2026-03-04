@@ -1,5 +1,7 @@
 "use client";
 import React from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useEffect } from 'react';
 import Sidebar from '../../../components/sidebar';
 import { motion } from 'framer-motion';
 import { 
@@ -13,6 +15,22 @@ import {
 
 export default function DashboardOverview() {
   // Statistički podaci (kasnije ćemo ih vući iz baze)
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const token = searchParams.get("token");
+    const userId = searchParams.get("user_id");
+
+    if (token && userId) {
+      // Spremi u localStorage isto kao kod običnog logina
+      localStorage.setItem("token", token);
+      localStorage.setItem("user_id", userId);
+      
+      // Očisti URL da ne stoji token u baru
+      router.replace("/dashboard");
+    }
+  }, [searchParams, router]);
   const stats = [
     { label: "Total Leads", value: "1,284", icon: Users, color: "text-[#00F5D4]", trend: "+12%" },
     { label: "Emails Sent", value: "852", icon: Send, color: "text-blue-400", trend: "+5.4%" },

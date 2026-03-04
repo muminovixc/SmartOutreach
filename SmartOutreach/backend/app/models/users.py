@@ -21,7 +21,11 @@ class User(Base):
     number = Column(Integer, nullable=True)
     company_name = Column(String, nullable=True)
     hashed_password = Column(String, nullable=False)
-    
+    google_access_token = Column(String, nullable=True)
+    google_refresh_token = Column(String, nullable=True)
+    google_token_expires_at = Column(DateTime, nullable=True)
+    is_active = Column(Integer, default=1)  # 1 za aktivne korisnike, 0 za neaktivne
+
     # Automatsko računanje vremena na serveru (UTC)
     created_at = Column(
         DateTime(timezone=True), 
