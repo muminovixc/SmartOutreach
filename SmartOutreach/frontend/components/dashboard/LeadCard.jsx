@@ -12,7 +12,7 @@ import {
   Sparkles,
   Copy,
   Check,
-  Edit3,
+  Mail,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -26,6 +26,7 @@ export default function LeadCard({
   const [saved, setSaved] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [generationStep, setGenerationStep] = useState("form");
+  const [foundEmail, setFoundEmail] = useState(lead.email || "");
 
   // Form & AI States
   const [service, setService] = useState("");
@@ -36,6 +37,42 @@ export default function LeadCard({
   const [editableBody, setEditableBody] = useState("");
 
   const [copied, setCopied] = useState(false);
+
+  const saveLead = async () => {
+    const userId = localStorage.getItem("user_id");
+    if (!userId) {
+      alert("Niste prijavljeni.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/leads/save`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: userId,
+          business_name: lead.title,
+          business_category: lead.category || "General",
+          address: lead.address || "No address",
+          phone: lead.phone || "No phone",
+          website: lead.website || "",
+          rating: lead.rating || 0,
+          email: foundEmail, // Spremamo i email ako je pronađen
+        }),
+      });
+
+      if (res.ok) {
+        setSaved(true);
+      } else {
+        alert("Greška pri spremanju lead-a.");
+      }
+    } catch (err) {
+      console.error("Greška pri slanju:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const generateAIEmail = async () => {
     if (!service) return alert("Please enter the service you offer.");
@@ -63,8 +100,11 @@ export default function LeadCard({
 
       const data = await res.json();
       if (data.status === "success") {
-        // Pretpostavljamo da backend vraća "Subject: ... \n\n Body: ..."
-        // Ili još bolje, razdvojena polja ako prepraviš backend (vidi korak 2)
+        // Logika za email sa backenda
+        if (data.lead_email && data.lead_email !== "no email") {
+            setFoundEmail(data.lead_email);
+        }
+
         const content = data.email_content;
         const subjectMatch = content.match(/Subject: (.*)/i);
         const bodyText = content.replace(/Subject: .*/i, "").trim();
@@ -87,6 +127,11 @@ export default function LeadCard({
   const sendEmailViaGmail = async () => {
     const token = localStorage.getItem("token");
     if (!token) return alert("Please log in again.");
+    
+    const targetEmail = foundEmail || lead.email;
+    if (!targetEmail || targetEmail === "no email") {
+        return alert("No recipient email found. Please enter it manually or check the website.");
+    }
 
     setIsSending(true);
     try {
@@ -99,9 +144,9 @@ export default function LeadCard({
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            target_email: lead.email || "recipient@example.com",
-            subject: editableSubject, // Šaljemo izmijenjeni subject
-            content: editableBody, // Šaljemo izmijenjeni body
+            target_email: targetEmail,
+            subject: editableSubject,
+            content: editableBody,
           }),
         },
       );
@@ -119,9 +164,16 @@ export default function LeadCard({
     }
   };
 
+  const copyToClipboard = () => {
+    const fullText = `Subject: ${editableSubject}\n\n${editableBody}`;
+    navigator.clipboard.writeText(fullText);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <>
-      {/* Kartica Lead-a (Nepromijenjena) */}
+      {/* Kartica Lead-a (Zadržan tvoj originalni dizajn) */}
       <motion.div className="group p-6 bg-zinc-900/30 border border-zinc-800 rounded-[2rem] hover:bg-zinc-900/50 hover:border-[#00F5D4]/30 transition-all duration-300 relative overflow-hidden font-sans">
         <div className="flex justify-between items-start mb-4">
           <div className="space-y-1 flex-1">
@@ -152,7 +204,6 @@ export default function LeadCard({
           </div>
         </div>
 
-        {/* Rating i Phone Info */}
         <div className="flex items-center justify-between mb-4">
           {lead.rating > 0 && (
             <div className="flex items-center gap-1 bg-zinc-950 px-2 py-1 rounded-lg border border-zinc-800">
@@ -169,7 +220,36 @@ export default function LeadCard({
           )}
         </div>
 
-        {/* Decorative Element */}
+        <div className="flex justify-end">
+          {isSavedPage ? (
+            <button
+              onClick={(e) => {
+                e.preventDefault();
+                if (onDelete) onDelete();
+              }}
+              className="p-3 rounded-xl bg-zinc-950 border border-zinc-800 text-zinc-600 hover:text-red-500 hover:border-red-500/50 transition-all"
+            >
+              <Trash2 size={18} />
+            </button>
+          ) : (
+            <button
+              onClick={saveLead}
+              disabled={loading || saved}
+              className={`p-3 rounded-xl transition-all ${
+                saved
+                  ? "bg-[#00F5D4]/20 text-[#00F5D4] border border-[#00F5D4]/30"
+                  : "bg-zinc-950 border border-zinc-800 text-zinc-500 hover:text-white hover:border-zinc-700"
+              }`}
+            >
+              {loading ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : (
+                <Bookmark size={18} fill={saved ? "#00F5D4" : "none"} />
+              )}
+            </button>
+          )}
+        </div>
+
         <div className="absolute -right-10 -top-10 w-24 h-24 bg-[#00F5D4]/5 blur-[60px] rounded-full pointer-events-none" />
       </motion.div>
 
@@ -180,24 +260,30 @@ export default function LeadCard({
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
-              className="relative w-full max-w-xl bg-[#0c0e12] border border-zinc-800 rounded-[2.5rem] p-8 shadow-2xl overflow-hidden"
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative w-full max-w-xl bg-[#0c0e12] border border-zinc-800 rounded-[2.5rem] p-8 shadow-2xl overflow-hidden font-sans"
             >
-              {/* Header */}
-              <div className="mb-6 flex justify-between items-start">
-                <div>
-                  <h2 className="font-['Syne'] text-2xl font-bold text-white uppercase italic italic tracking-tighter">
-                    AI Composer
-                  </h2>
-                  <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mt-1">
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="absolute top-6 right-6 text-zinc-500 hover:text-white"
+              >
+                <X size={20} />
+              </button>
+
+              <div className="mb-6">
+                <h2 className="font-['Syne'] text-2xl font-bold text-white uppercase italic tracking-tighter flex items-center gap-2">
+                  <Sparkles size={20} className="text-[#00F5D4]" /> AI Composer
+                </h2>
+                <div className="flex items-center gap-2 mt-1">
+                    <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">
                     Target: {lead.title}
-                  </p>
+                    </p>
+                    {foundEmail && foundEmail !== "no email" && (
+                        <span className="text-[#00F5D4] text-[9px] font-bold uppercase px-2 py-0.5 bg-[#00F5D4]/10 rounded-full border border-[#00F5D4]/20 flex items-center gap-1">
+                            <Mail size={10} /> {foundEmail}
+                        </span>
+                    )}
                 </div>
-                <button
-                  onClick={() => setIsModalOpen(false)}
-                  className="text-zinc-500 hover:text-white"
-                >
-                  <X size={20} />
-                </button>
               </div>
 
               {generationStep === "form" && (
@@ -209,9 +295,16 @@ export default function LeadCard({
                   >
                     <option value="English">English</option>
                     <option value="German">German</option>
-                    <option value="Bosnian/Serbian/Croatian">
-                      Bosnian/Serbian/Croatian
-                    </option>
+                    <option value="Bosanski">Bosanski</option>
+                    <option value="Српски">Српски</option>
+                    <option value="hrvatski">Hrvatski</option>
+                    <option value="македонски">Македонски</option>
+                    <option value="Русский">Русский</option>
+                    <option value="中文">中文</option>
+                    <option value="Español">Español</option>
+                    <option value="Français">Français</option>
+                    <option value="العربية">العربية</option>
+                    <option value="Türkçe">Türkçe</option>
                   </select>
                   <textarea
                     placeholder="Describe your service..."
@@ -221,9 +314,9 @@ export default function LeadCard({
                   />
                   <button
                     onClick={generateAIEmail}
-                    className="w-full py-4 bg-[#00F5D4] text-black font-bold uppercase font-['Syne'] rounded-2xl hover:bg-[#00f5d4ef] transition-all"
+                    className="w-full py-4 bg-[#00F5D4] text-black font-bold uppercase font-['Syne'] rounded-2xl hover:bg-[#00f5d4ef] transition-all flex items-center justify-center gap-2"
                   >
-                    Generate Draft
+                    Generate Draft <Send size={16} />
                   </button>
                 </div>
               )}
@@ -232,14 +325,13 @@ export default function LeadCard({
                 <div className="py-20 flex flex-col items-center gap-4">
                   <Loader2 className="text-[#00F5D4] animate-spin" size={40} />
                   <p className="text-white text-xs font-bold uppercase tracking-widest animate-pulse">
-                    Drafting Email...
+                    Scanning website & drafting...
                   </p>
                 </div>
               )}
 
               {generationStep === "result" && (
                 <div className="space-y-4">
-                  {/* EDITABLE SUBJECT */}
                   <div className="space-y-1">
                     <label className="text-[9px] font-bold uppercase text-zinc-500 tracking-widest ml-1">
                       Subject Line
@@ -252,7 +344,6 @@ export default function LeadCard({
                     />
                   </div>
 
-                  {/* EDITABLE BODY */}
                   <div className="space-y-1">
                     <label className="text-[9px] font-bold uppercase text-zinc-500 tracking-widest ml-1">
                       Email Body
@@ -264,7 +355,6 @@ export default function LeadCard({
                     />
                   </div>
 
-                  {/* Actions */}
                   <div className="flex gap-3 pt-2">
                     <button
                       onClick={() => setGenerationStep("form")}
@@ -286,8 +376,13 @@ export default function LeadCard({
                       )}
                     </button>
                   </div>
+                  <button onClick={copyToClipboard} className="w-full text-[9px] uppercase tracking-[0.3em] text-zinc-600 hover:text-[#00F5D4] transition-colors flex items-center justify-center gap-2">
+                    {copied ? <Check size={12}/> : <Copy size={12}/>} {copied ? "Copied" : "Copy to clipboard"}
+                  </button>
                 </div>
               )}
+              {/* Dekorativni blur unutar modala */}
+              <div className="absolute -left-20 -bottom-20 w-40 h-40 bg-[#00F5D4]/5 blur-[80px] rounded-full pointer-events-none" />
             </motion.div>
           </div>
         )}

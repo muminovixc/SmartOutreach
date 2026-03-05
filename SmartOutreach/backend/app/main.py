@@ -29,7 +29,7 @@ origins = [
     "http://127.0.0.1:3000", # Česta alternativa za localhost
 ]
 
-app.add_middleware(
+app.add_middleware( 
     CORSMiddleware,
     allow_origins=origins,           # Dozvoli pristup tvom Next.js-u
     allow_credentials=True,          # Dozvoli slanje kolačića (bitno za Auth)

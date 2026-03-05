@@ -8,7 +8,8 @@ from app.schemas.leads import CompanyRequest
 import google.generativeai as genai
 from app.schemas.leads import EmailGenerationRequest
 import os
-
+from dotenv import load_dotenv
+from app.services.dashboard.lead_services import scrape_lead_info
 
 router = APIRouter(prefix="/leads", tags=["Leads"])
 genai.configure(api_key=os.environ.get("GEMINI_KEY"))  # Postavi GEMINI_KEY iz .env datoteke
@@ -82,59 +83,42 @@ async def delete_lead(lead_id: str, db: Session = Depends(get_db)):
     return {"status": "success", "message": "Lead deleted"}
 
 
-# Endpoint za generisanje personalizovanog emaila koristeći Gemini-1.5-Flash
 @router.post("/generate-email")
 async def generate_personalized_email(request: EmailGenerationRequest):
     try:
-        # Koristimo najbrži i najnoviji model za tekst
-        model = genai.GenerativeModel("gemini-2.5-flash") 
+        # 1. Skupljamo info sa web sajta
+        found_email, website_context = await scrape_lead_info(request.website_url)
+
+        model = genai.GenerativeModel("gemini-2.5-flash")
         
-        # PROMPT: Direktno, kratko i personalizovano
+        # 2. Prompt koji koristi 'website_context'
         prompt = (
-            f"Write a short,unique, high-converting cold email to a potential client.\n"
-            f"Target Company Website: {request.website_url}\n"
-            f"Company Name: {request.company_name}\n"
-            "STRICT FORMAT:\n"
-            "Subject: [Your Subject Here]\n"
-            "Body:\n"
-            "[Your Body Here]\n\n"
-            f"Service I Offer: {request.service_offered}\n"
-            f"Language: {request.language}\n"
-            f"Sender Name: {request.sender_name}\n\n"
+            f"You are a world-class sales copywriter.\n"
+            f"Using the following context from the company's website, write a highly personalized cold email.\n\n"
+            f"COMPANY CONTEXT:\n{website_context}\n\n" 
+            f"COMPANY NAME: {request.company_name}\n"
+            f"SERVICE I OFFER: {request.service_offered}\n"
+            f"SENDER NAME: {request.sender_name}\n"
+            f"LANGUAGE: {request.language}\n\n"
+            "INSTRUCTIONS:\n"
+            "1. Mention a specific detail from the context to prove this isn't a template.\n"
+            "2. Keep it under 100 words.\n"
+            "3. Focus on how my service helps THEM specifically based on what they do.\n"
+            "4. Tone: Professional but human.\n\n"
+            "5. do not question lead like are you sure? or something like that"
+            "6. do not introduce myself in the email, just jump straight to the point and value proposition\n\n"
+            "7. end email respectfully"
+            "Subject: <subject>\n\n"
+            "<body>"
+        )
 
-            "OBJECTIVE:\n"
-            "Generate a personalized cold email that feels human, relevant, and concise.\n\n"
-
-            "GUIDELINES:\n"
-            "1. Tone: Professional, conversational, confident.\n"
-            "2. Start with a specific observation or insight related to their website or industry.\n"
-            "3. Clearly connect my service to a likely pain point.\n"
-            "4. Focus on relevance and curiosity, not aggressive selling.\n"
-            "5. Length: 80-100 words max.\n"
-            "6. Use one simple, low-friction CTA at the end.\n"
-            "7. Avoid clichés and generic phrases.\n"
-            "8. Do not fabricate specific facts about the company.\n"
-            "9. Do not include disclaimers or mention AI.\n"
-            "10. End only with respect and the sender's name.\n\n"
-            "11. dont include something like 'i visited your website' just tell something specific about the company that you can find on their website or google maps listing\n\n"
-
-            "OUTPUT FORMAT:\n"
-            "Subject: <subject line>\n\n"
-            "<email body>"
-                )
         response = model.generate_content(prompt)
-        
-        if not response or not response.text:
-            return {"status": "error", "email_content": "Failed to generate email"}
-
         email_text = response.text.strip()
         
-        # Ovdje možemo razdvojiti Subject i Body ako Gemini formatira sa "Subject:"
         return {
             "status": "success", 
-            "email_content": email_text
+            "email_content": email_text,
+            "lead_email": found_email
         }
-
     except Exception as e:
-        print(f"DEBUG: Gemini Error: {e}")
         return {"status": "error", "message": str(e)}
