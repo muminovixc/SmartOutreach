@@ -45,7 +45,10 @@ def login(login_data: UserLogin, db: Session = Depends(get_db)):
     return {
         "access_token": access_token, 
         "token_type": "bearer",
-        "user_id": str(user.id)
+        "user_id": str(user.id),
+        "user_email": user.email,
+        "user_name": user.name,
+        "user_surname": user.surname
     }
 
 # --- GOOGLE OAUTH SEKCIJA ---
@@ -143,4 +146,4 @@ async def google_callback(code: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Nevalidan Google token")
 
     my_jwt = create_access_token(data={"sub": str(user.id), "email": user.email})
-    return RedirectResponse(url=f"http://localhost:3000/dashboard?token={my_jwt}&user_id={user.id}")
+    return RedirectResponse(url=f"http://localhost:3000/dashboard?token={my_jwt}&user_id={user.id}&user_email={user.email}&user_name={user.name}&user_surname={user.surname}")

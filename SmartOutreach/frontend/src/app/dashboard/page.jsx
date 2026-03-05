@@ -12,6 +12,7 @@ import {
   ArrowUpRight,
   Zap
 } from 'lucide-react';
+import Footer from '../../../components/footer';
 
 export default function DashboardOverview() {
   // Statistički podaci (kasnije ćemo ih vući iz baze)
@@ -21,11 +22,17 @@ export default function DashboardOverview() {
   useEffect(() => {
     const token = searchParams.get("token");
     const userId = searchParams.get("user_id");
+    const userEmail = searchParams.get("user_email");
+    const userName = searchParams.get("user_name");
+    const userSurname = searchParams.get("user_surname");
 
     if (token && userId) {
       // Spremi u localStorage isto kao kod običnog logina
       localStorage.setItem("token", token);
       localStorage.setItem("user_id", userId);
+      localStorage.setItem("user_email", userEmail);
+      localStorage.setItem("user_name", userName);
+      localStorage.setItem("user_surname", userSurname);
       
       // Očisti URL da ne stoji token u baru
       router.replace("/dashboard");
@@ -112,10 +119,15 @@ export default function DashboardOverview() {
             </p>
           </section>
         </div>
+
+          <Footer /> {/* Footer se rendera ispod svega */}
       </main>
+    
 
       {/* BACKGROUND GLOW */}
       <div className="fixed top-0 right-0 w-[500px] h-[500px] bg-blue-600/5 blur-[120px] -z-10 rounded-full" />
+      
     </div>
+    
   );
 }

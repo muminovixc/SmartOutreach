@@ -2,11 +2,14 @@
 import React, { useState } from 'react';
 import { LayoutDashboard, Send, Users, Settings, LogOut, Zap, Search, Menu, X, Bookmark } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function Sidebar() {
   const router = useRouter();
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+
+  
 
   const menuItems = [
     { icon: LayoutDashboard, label: "Overview", path: "/dashboard" },
@@ -26,6 +29,7 @@ export default function Sidebar() {
 
   const handleLogout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('user_id');
     router.push('/login');
   };
 

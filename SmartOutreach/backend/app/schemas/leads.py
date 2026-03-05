@@ -17,3 +17,11 @@ class LeadResponse(LeadCreate):
 class CompanyRequest(BaseModel):
     company_name: str 
     city: Optional[str] = None
+
+class EmailGenerationRequest(BaseModel):
+    website_url: str
+    service_offered: str  # npr. "Web Design", "SEO", "AI Automations"
+    company_name: str
+    language: Optional[str] = "English"
+    sender_name: Optional[str] = None  # Ime osobe kojoj se obraća, ako je poznato
+    company_name: Optional[str] = None  # Naziv kompanije kojoj se obraća, ako je poznato

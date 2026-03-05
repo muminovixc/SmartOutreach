@@ -36,7 +36,7 @@ app.add_middleware(
     allow_methods=["*"],             # Dozvoli sve HTTP metode (GET, POST, PUT, DELETE)
     allow_headers=["*"],             # Dozvoli sve headere
 )
-
+ 
 
 app.include_router(auth_router)  
 app.include_router(leads_router) 

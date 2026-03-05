@@ -1,15 +1,42 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Zap, ArrowRight,  } from "lucide-react";
+import { Zap, ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 export default function LoginPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
+
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const token = searchParams.get("token");
+    const userId = searchParams.get("user_id");
+    
+
+    if (token) {
+      // 1. Spremi u localStorage
+      localStorage.setItem("token", token);
+      if (userId) localStorage.setItem("user_id", userId);
+
+      // 2. Očisti URL parametre radi čistoće
+      window.history.replaceState({}, document.title, "/login");
+
+      // 3. KLJUČNO: Odmah prebaci korisnika na dashboard
+      router.push("/dashboard");
+    } else {
+      // Opcionalno: Ako korisnik ručno dođe na /login, a već ima token, pošalji ga na dashboard
+      const existingToken = localStorage.getItem("token");
+      if (existingToken) {
+        router.push("/dashboard");
+      }
+    }
+  }, [searchParams, router]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -31,6 +58,10 @@ export default function LoginPage() {
         // Spremi token u localStorage (ili bolje u Cookies)
         localStorage.setItem("token", data.access_token);
         localStorage.setItem("user_id", data.user_id);
+        localStorage.setItem("user_email", data.user_email);
+        console.log("User email stored in localStorage:", data.user_email);
+        localStorage.setItem("user_name", data.user_name);
+        localStorage.setItem("user_surname", data.user_surname);
         router.push("/dashboard"); // Prebaci ga na dashboard
       } else {
         setError(data.detail || "Login failed");
