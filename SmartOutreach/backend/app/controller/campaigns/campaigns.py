@@ -10,10 +10,12 @@ from google.auth.transport.requests import Request
 from ...db.session import get_db
 from ...models.users import User  
 from ...models.campaigns import Campaign
+import base64
 import datetime
 from pydantic import BaseModel
 from ...services.auth import get_current_user  
 from ...schemas.leads import EmailSendRequest  
+from ...services.campaign import clean_gmail_body
 
 router = APIRouter(prefix="/campaigns", tags=["Campaigns"])
 
@@ -179,3 +181,76 @@ async def sync_all_campaigns(
     background_tasks.add_task(check_threads)
 
     return {"status": "success", "message": f"Syncing {len(campaigns_to_check)} campaigns..."}
+
+
+@router.get("/{campaign_id}/thread")
+async def get_campaign_thread(
+    campaign_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # 1. Nađi kampanju u bazi
+    camp = db.query(Campaign).filter(Campaign.id == campaign_id, Campaign.user_id == current_user.id).first()
+    if not camp or not camp.thread_id:
+        return [] # Vrati prazno ako nema threada
+
+    # 2. Poveži se na Gmail
+    creds = Credentials(
+        token=current_user.google_access_token,
+        refresh_token=current_user.google_refresh_token,
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=os.environ.get("GOOGLE_CLIENT_ID"),
+        client_secret=os.environ.get("GOOGLE_CLIENT_SECRET")
+    )
+    service = build('gmail', 'v1', credentials=creds)
+
+    try:
+        thread = service.users().threads().get(userId='me', id=camp.thread_id).execute()
+        messages = thread.get('messages', [])
+        
+        thread_data = []
+        for msg in messages:
+            payload = msg.get('payload', {})
+            body = ""
+            
+            # --- DEKODIRANJE BODY-ja (Poboljšano) ---
+            if 'parts' in payload:
+                for part in payload['parts']:
+                    if part['mimeType'] == 'text/plain':
+                        data = part['body'].get('data', '')
+                        body = base64.urlsafe_b64decode(data).decode('utf-8')
+                        break # Uzmi prvi plain text dio i izađi
+            else:
+                data = payload.get('body', {}).get('data', '')
+                if data:
+                    body = base64.urlsafe_b64decode(data).decode('utf-8')
+
+            # --- ČIŠĆENJE TEKSTA ---
+            body = clean_gmail_body(body)
+
+            # --- IZVLAČENJE VREMENA ---
+            # Gmail vraća internalDate u milisekundama
+            timestamp = int(msg.get('internalDate', 0)) / 1000
+            dt = datetime.datetime.fromtimestamp(timestamp)
+            time_str = dt.strftime("%H:%M")
+            date_str = dt.strftime("%d.%m.")
+
+            # --- POŠILJALAC ---
+            headers = payload.get('headers', [])
+            sender_full = next((h['value'] for h in headers if h['name'].lower() == 'from'), "Unknown")
+            
+            # Provjera da li je poruka od nas
+            is_me = current_user.email.lower() in sender_full.lower()
+
+            thread_data.append({
+                "sender": sender_full,
+                "body": body,
+                "is_me": is_me,
+                "time": time_str,
+                "date": date_str
+            })
+
+        return thread_data
+    except Exception as e:
+        print(f"Error fetching thread: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

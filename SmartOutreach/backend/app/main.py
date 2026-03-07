@@ -13,7 +13,7 @@ from .controller.campaigns.campaigns import router as campaigns_router
 load_dotenv()
 
 # 2. Kreiraj tabele u bazi ako ne postoje (automatska migracija)
-Base.metadata.create_all(bind=engine) 
+Base.metadata.create_all(bind=engine)  
 
 app = FastAPI(
     title="SmartReach AI API",
