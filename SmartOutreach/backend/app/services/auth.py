@@ -3,6 +3,12 @@ from ..models.users import User
 from ..schemas.auth import UserCreate
 # pip install passlib[bcrypt]
 from passlib.context import CryptContext
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from jose import JWTError, jwt
+from sqlalchemy.orm import Session
+from ..db.session import get_db
+import os
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -55,3 +61,30 @@ def authenticate_user(db: Session, email: str, password: str):
     if not verify_password(password, user.hashed_password):
         return False
     return user
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    try:
+        # 1. Dekodiranje koristeći tvoj tajni ključ
+        payload = jwt.decode(token, os.getenv("SECRET_KEY"), algorithms=["HS256"])
+        
+        # 2. Uzimanje ID-a iz "sub" polja (tvoj token ga ima, vidim iz debuga)
+        user_id: str = payload.get("sub")
+        
+        if user_id is None:
+            print("DEBUG: 'sub' polje nije pronađeno u tokenu")
+            raise HTTPException(status_code=401, detail="Invalid token payload")
+
+        # 3. Pronalazak korisnika (BITNO: Cast-uj string u UUID ako treba)
+        user = db.query(User).filter(User.id == user_id).first()
+        
+        if user is None:
+            print(f"DEBUG: Korisnik sa ID-om {user_id} ne postoji u bazi")
+            raise HTTPException(status_code=401, detail="User not found")
+            
+        return user
+
+    except JWTError as e:
+        print(f"DEBUG: JWT Error: {str(e)}")
+        raise HTTPException(status_code=401, detail="Token has expired or is invalid")

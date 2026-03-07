@@ -25,3 +25,10 @@ class EmailGenerationRequest(BaseModel):
     language: Optional[str] = "English"
     sender_name: Optional[str] = None  # Ime osobe kojoj se obraća, ako je poznato
     company_name: Optional[str] = None  # Naziv kompanije kojoj se obraća, ako je poznato
+
+
+class EmailSendRequest(BaseModel):
+    lead_name: str
+    target_email: str
+    subject: str
+    content: str

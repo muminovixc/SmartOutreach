@@ -107,7 +107,7 @@ async def generate_personalized_email(request: EmailGenerationRequest):
             "4. Tone: Professional but human.\n\n"
             "5. do not question lead like are you sure? or something like that"
             "6. do not introduce myself in the email, just jump straight to the point and value proposition\n\n"
-            "7. end email respectfully"
+            "7. end the email with a question that invites a response, but do not ask if they are interested, ask something more specific related to their business\n\n"
             "Subject: <subject>\n\n"
             "<body>"
         )
