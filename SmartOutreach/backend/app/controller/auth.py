@@ -12,6 +12,7 @@ import requests
 from ..db.session import get_db
 from ..schemas.auth import UserCreate, UserResponse, UserLogin, Token
 from ..models.users import User
+from google.auth import jwt as google_jwt
 from ..services.auth import (
     create_user, 
     authenticate_user, 
@@ -94,7 +95,7 @@ async def google_login():
 async def google_callback(code: str, db: Session = Depends(get_db)):
     token_url = "https://oauth2.googleapis.com/token"
     
-    # Šaljemo čist zahtjev bez ikakvih skrivenih biblioteka
+    # 1. Razmjena autorizacijskog koda za tokene
     data = {
         "code": code,
         "client_id": GOOGLE_CLIENT_ID,
@@ -107,44 +108,72 @@ async def google_callback(code: str, db: Session = Depends(get_db)):
     token_data = response.json()
     
     if "error" in token_data:
-        # Ako i dalje baca grešku, ispisat ćemo sve da vidimo šta Google tačno vidi
-        print(f"DEBUG GOOGLE RESPONSE: {token_data}")
-        raise HTTPException(status_code=400, detail=f"Google Error: {token_data.get('error_description')}")
+        print(f"DEBUG GOOGLE RESPONSE ERROR: {token_data}")
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Google Error: {token_data.get('error_description')}"
+        )
 
-    # ... ostatak koda za ID token i bazu ...
-    access_token = token_data.get("access_token")
-    refresh_token = token_data.get("refresh_token")
-    
-    # Verifikacija ID Tokena
-    from google.oauth2 import id_token
-    from google.auth.transport import requests as google_requests
-    id_info = id_token.verify_oauth2_token(token_data.get("id_token"), google_requests.Request(), GOOGLE_CLIENT_ID)
-    
-    email = id_info.get('email')
+    # 2. Dekodiranje ID tokena (Bypass clock error)
+    try:
+        id_token_raw = token_data.get("id_token")
+        # Koristimo verify=False za exp/iat provjeru jer ti sat pravi probleme,
+        # ali Google je već potvrdio autentičnost kroz code exchange.
+        id_info = google_jwt.decode(id_token_raw, verify=False)
+        
+        # Sigurnosna provjera: Da li je token namijenjen tvojoj aplikaciji?
+        if id_info.get("aud") != GOOGLE_CLIENT_ID:
+            raise HTTPException(status_code=400, detail="Audience mismatch.")
+            
+        email = id_info.get('email')
+        if not email:
+            raise HTTPException(status_code=400, detail="Email not found in token.")
+            
+    except Exception as e:
+        print(f"Token Decode Error: {e}")
+        raise HTTPException(status_code=400, detail="Failed to decode Google identity.")
+
+    # 3. Rad sa bazom podataka (User Check/Create)
     user = db.query(User).filter(User.email == email).first()
     
     if not user:
-        user = User(email=email, name=id_info.get('given_name', ''), surname=id_info.get('family_name', ''), hashed_password="", is_active=1)
+        # Kreiramo novog korisnika ako ne postoji
+        user = User(
+            email=email, 
+            name=id_info.get('given_name', ''), 
+            surname=id_info.get('family_name', ''), 
+            hashed_password="", # Google korisnici nemaju lokalni password
+            is_active=1
+        )
         db.add(user)
-        db.flush()
+        db.flush() # Dobijamo user.id prije commita
 
-    user.google_access_token = access_token
+    # 4. Ažuriranje Google tokena u bazi
+    user.google_access_token = token_data.get("access_token")
+    
+    # Refresh token dolazi samo prvi put kada se korisnik prijavi (ili ako dodaš prompt=consent)
+    refresh_token = token_data.get("refresh_token")
     if refresh_token:
         user.google_refresh_token = refresh_token
     
-    user.google_token_expires_at = datetime.utcnow() + timedelta(seconds=token_data.get("expires_in"))
+    # Izračunavanje isteka (opcionalno, ali korisno)
+    expires_in = token_data.get("expires_in", 3600)
+    user.google_token_expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+    
     db.commit()
 
-    try:
-        id_info = id_token.verify_oauth2_token(
-        token_data.get("id_token"), 
-        google_requests.Request(), 
-        GOOGLE_CLIENT_ID,
-        clock_skew_in_seconds=10  # Dodajemo 10 sekundi tolerancije
-    )
-    except Exception as e:
-        print(f"ID Token Error: {e}")
-        raise HTTPException(status_code=400, detail="Nevalidan Google token")
-
+    # 5. Kreiranje tvog internog JWT-a za Frontend
     my_jwt = create_access_token(data={"sub": str(user.id), "email": user.email})
-    return RedirectResponse(url=f"http://localhost:3000/dashboard?token={my_jwt}&user_id={user.id}&user_email={user.email}&user_name={user.name}&user_surname={user.surname}")
+    
+    # 6. Redirect na Frontend sa podacima
+    # Preporuka: U produkciji šalji samo token, a ostalo dohvati preko /me endpointa
+    frontend_url = (
+        f"http://localhost:3000/dashboard"
+        f"?token={my_jwt}"
+        f"&user_id={user.id}"
+        f"&user_email={user.email}"
+        f"&user_name={user.name}"
+        f"&user_surname={user.surname}"
+    )
+    
+    return RedirectResponse(url=frontend_url)

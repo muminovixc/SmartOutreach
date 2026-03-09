@@ -185,7 +185,7 @@ export default function CampaignsPage() {
                                   </p>
                                   <span className="text-[9px] text-zinc-600 font-bold uppercase">{msg.date} • {msg.time}</span>
                                 </div>
-                                <p className={`text-sm leading-relaxed whitespace-pre-wrap ${msg.is_me ? "text-zinc-200 text-right" : "text-zinc-300 text-left"}`}>
+                                <p className={`text-sm leading-relaxed whitespace-pre-wrap ${msg.is_me ? "text-zinc-200 " : "text-zinc-300 text-left"}`}>
                                   {msg.body}
                                 </p>
                               </div>

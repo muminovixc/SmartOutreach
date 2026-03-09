@@ -8,7 +8,7 @@ from .db.session import engine, Base
 from .controller.auth import router as auth_router
 from .controller.dashboard.leads import router as leads_router
 from .controller.campaigns.campaigns import router as campaigns_router
-
+ 
 # 1. Učitaj enviroment varijable iz .env fajla
 load_dotenv()
 

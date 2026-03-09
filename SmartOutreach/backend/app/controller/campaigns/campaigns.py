@@ -1,8 +1,10 @@
 import base64
 import os
-from sqlalchemy import func
+import datetime
 from email.mime.text import MIMEText
-from fastapi import APIRouter, HTTPException, Depends, status
+from typing import List
+from sqlalchemy.orm import Session
+from fastapi import APIRouter, HTTPException, Depends, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
@@ -10,16 +12,36 @@ from google.auth.transport.requests import Request
 from ...db.session import get_db
 from ...models.users import User  
 from ...models.campaigns import Campaign
-import base64
-import datetime
-from pydantic import BaseModel
 from ...services.auth import get_current_user  
 from ...schemas.leads import EmailSendRequest  
-from ...services.campaign import clean_gmail_body
+from ...services.campaign import clean_gmail_body 
 
 router = APIRouter(prefix="/campaigns", tags=["Campaigns"])
 
+# --- POMOĆNA FUNKCIJA ZA GMAIL SERVICE ---
+def _get_google_service(user: User, db: Session):
+    """Vraća validan Gmail service i automatski osvježava token ako je istekao."""
+    creds = Credentials(
+        token=user.google_access_token,
+        refresh_token=user.google_refresh_token,
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=os.environ.get("GOOGLE_CLIENT_ID"),
+        client_secret=os.environ.get("GOOGLE_CLIENT_SECRET")
+    )
 
+    if not creds.valid:
+        if creds.expired and creds.refresh_token:
+            try:
+                creds.refresh(Request())
+                user.google_access_token = creds.token
+                db.commit()
+                db.refresh(user)
+            except Exception:
+                return None
+        else:
+            return None
+    
+    return build('gmail', 'v1', credentials=creds)
 
 @router.post("/send")
 async def send_email(
@@ -27,47 +49,24 @@ async def send_email(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # 1. Provjera imamo li tokene u bazi za trenutnog korisnika
-    if not current_user.google_access_token or not current_user.google_refresh_token:
+    service = _get_google_service(current_user, db)
+    if not service:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, 
-            detail="Google Gmail nije povezan. Molimo prijavite se ponovo preko Google-a."
+            detail="Google session expired. Please reconnect Gmail."
         )
 
-    # 2. Postavljanje Google Credentials-a
-    creds = Credentials(
-        token=current_user.google_access_token,
-        refresh_token=current_user.google_refresh_token,
-        token_uri="https://oauth2.googleapis.com/token",
-        client_id=os.environ.get("GOOGLE_CLIENT_ID"),
-        client_secret=os.environ.get("GOOGLE_CLIENT_SECRET")
-    ) 
-
-    # 3. Osvježavanje tokena ako je istekao
-    if creds.expired and creds.refresh_token:
-        try:
-            creds.refresh(Request())
-            # Spremi novi access_token u bazu
-            current_user.google_access_token = creds.token
-            db.commit()
-        except Exception as e:
-            raise HTTPException(status_code=401, detail="Session expired. Reconnect Gmail.")
-
     try:
-        service = build('gmail', 'v1', credentials=creds)
-        
         message = MIMEText(request.content)
         message['to'] = request.target_email
         message['subject'] = request.subject
         raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode('utf-8')
         
-        # Slanje
         sent_message = service.users().messages().send(
             userId='me', 
             body={'raw': raw_message}
         ).execute()
 
-        # NOVO: Uzimamo threadId iz odgovora Gmail API-ja
         gmail_thread_id = sent_message.get('threadId')
 
         new_campaign = Campaign(
@@ -77,40 +76,16 @@ async def send_email(
             subject=request.subject,
             content=request.content,
             status="sent",
-            thread_id=gmail_thread_id  # Spremamo thread_id
+            thread_id=gmail_thread_id
         )
         
         db.add(new_campaign)
         db.commit()
-        db.refresh(new_campaign)
-
         return {"status": "success", "thread_id": gmail_thread_id}
 
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-
-@router.get("/history")
-async def get_campaign_history(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    try:
-        # Dohvaćamo kampanje korisnika sortirane od najnovijih
-        campaigns = db.query(Campaign)\
-            .filter(Campaign.user_id == current_user.id)\
-            .order_by(Campaign.created_at.desc())\
-            .all()
-        
-        return campaigns
-    except Exception as e:
-        print(f"Error fetching history: {e}")
-        raise HTTPException(status_code=500, detail="Could not fetch campaign history")
-    
-
-from fastapi import BackgroundTasks
+        raise HTTPException(status_code=500, detail=f"Gmail API Error: {str(e)}")
 
 @router.get("/sync-all")
 async def sync_all_campaigns(
@@ -118,9 +93,6 @@ async def sync_all_campaigns(
     db: Session = Depends(get_db), 
     current_user: User = Depends(get_current_user)
 ):
-    print('Sync proces pokrenut...')
-    
-    # 1. Uzimamo kampanje koje su poslane i imaju thread_id
     campaigns_to_check = db.query(Campaign).filter(
         Campaign.user_id == current_user.id,
         Campaign.status == "sent",
@@ -130,19 +102,20 @@ async def sync_all_campaigns(
     if not campaigns_to_check:
         return {"status": "success", "message": "No campaigns to sync."}
 
-    # 2. Funkcija za pozadinsku obradu
-    def check_threads():
-        creds = Credentials(
-            token=current_user.google_access_token,
-            refresh_token=current_user.google_refresh_token,
-            token_uri="https://oauth2.googleapis.com/token",
-            client_id=os.environ.get("GOOGLE_CLIENT_ID"),
-            client_secret=os.environ.get("GOOGLE_CLIENT_SECRET")
-        )
-        service = build('gmail', 'v1', credentials=creds)
+    # Prosleđujemo user_id i ID-eve kampanja umjesto cijelih objekata da izbjegnemo DetachedInstanceError
+    user_id = current_user.id
+    campaign_ids = [c.id for c in campaigns_to_check]
 
-        for camp in campaigns_to_check:
-            print(f"Provjera: {camp.target_email} | Thread: {camp.thread_id}")
+    def check_threads_task(u_id: str, c_ids: List[int]):
+        # Background task treba svoju sesiju
+        new_db = next(get_db())
+        user = new_db.query(User).filter(User.id == u_id).first()
+        service = _get_google_service(user, new_db)
+        
+        if not service: return
+
+        for c_id in c_ids:
+            camp = new_db.query(Campaign).filter(Campaign.id == c_id).first()
             try:
                 thread = service.users().threads().get(userId='me', id=camp.thread_id).execute()
                 messages = thread.get('messages', [])
@@ -150,38 +123,22 @@ async def sync_all_campaigns(
                 if len(messages) > 1:
                     last_msg = messages[-1]
                     headers = last_msg.get('payload', {}).get('headers', [])
-                    
-                    # Sigurno izvlačenje From headera
                     sender_header = next((h['value'] for h in headers if h['name'].lower() == 'from'), "").lower()
                     
-                    # Provera da li je pošiljalac neko drugi (ne trenutni korisnik)
-                    is_not_me = current_user.email.lower() not in sender_header
-                    
-                    if is_not_me:
+                    if user.email.lower() not in sender_header:
                         camp.status = "replied"
-                        print(f"DEBUG: Pronađen odgovor od {sender_header}")
-                        
-                        # Odmah ažuriramo bazu za tu kampanju
                         camp.last_checked = datetime.datetime.utcnow()
-                        db.add(camp)
-                        db.commit()
-                        db.refresh(camp)
-                        print(f"✅ Status ažuriran u bazi za: {camp.target_email}")
-                    else:
-                        # Ako smo mi poslali poruku (follow-up), samo ažuriraj vreme provjere
-                        camp.last_checked = datetime.datetime.utcnow()
-                        db.commit()
-                
+                        new_db.commit()
+                else:
+                    camp.last_checked = datetime.datetime.utcnow()
+                    new_db.commit()
             except Exception as e:
-                print(f"Greška kod thread-a {camp.thread_id}: {e}")
-                db.rollback()
+                print(f"Error syncing thread {camp.thread_id}: {e}")
                 continue
+        new_db.close()
 
-    # 3. Pokreni pozadinski task
-    background_tasks.add_task(check_threads)
-
+    background_tasks.add_task(check_threads_task, user_id, campaign_ids)
     return {"status": "success", "message": f"Syncing {len(campaigns_to_check)} campaigns..."}
-
 
 @router.get("/{campaign_id}/thread")
 async def get_campaign_thread(
@@ -189,20 +146,13 @@ async def get_campaign_thread(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # 1. Nađi kampanju u bazi
     camp = db.query(Campaign).filter(Campaign.id == campaign_id, Campaign.user_id == current_user.id).first()
     if not camp or not camp.thread_id:
-        return [] # Vrati prazno ako nema threada
+        return []
 
-    # 2. Poveži se na Gmail
-    creds = Credentials(
-        token=current_user.google_access_token,
-        refresh_token=current_user.google_refresh_token,
-        token_uri="https://oauth2.googleapis.com/token",
-        client_id=os.environ.get("GOOGLE_CLIENT_ID"),
-        client_secret=os.environ.get("GOOGLE_CLIENT_SECRET")
-    )
-    service = build('gmail', 'v1', credentials=creds)
+    service = _get_google_service(current_user, db)
+    if not service:
+        raise HTTPException(status_code=401, detail="Gmail session expired.")
 
     try:
         thread = service.users().threads().get(userId='me', id=camp.thread_id).execute()
@@ -211,46 +161,42 @@ async def get_campaign_thread(
         thread_data = []
         for msg in messages:
             payload = msg.get('payload', {})
+            headers = payload.get('headers', [])
             body = ""
             
-            # --- DEKODIRANJE BODY-ja (Poboljšano) ---
-            if 'parts' in payload:
-                for part in payload['parts']:
+            # Poboljšano izvlačenje body-ja (provjerava i nested parts)
+            def get_body(parts):
+                for part in parts:
                     if part['mimeType'] == 'text/plain':
-                        data = part['body'].get('data', '')
-                        body = base64.urlsafe_b64decode(data).decode('utf-8')
-                        break # Uzmi prvi plain text dio i izađi
+                        return base64.urlsafe_b64decode(part['body'].get('data', '')).decode('utf-8')
+                    if 'parts' in part:
+                        res = get_body(part['parts'])
+                        if res: return res
+                return ""
+
+            if 'parts' in payload:
+                body = get_body(payload['parts'])
             else:
-                data = payload.get('body', {}).get('data', '')
-                if data:
-                    body = base64.urlsafe_b64decode(data).decode('utf-8')
+                body = base64.urlsafe_b64decode(payload.get('body', {}).get('data', '')).decode('utf-8')
 
-            # --- ČIŠĆENJE TEKSTA ---
             body = clean_gmail_body(body)
-
-            # --- IZVLAČENJE VREMENA ---
-            # Gmail vraća internalDate u milisekundama
             timestamp = int(msg.get('internalDate', 0)) / 1000
             dt = datetime.datetime.fromtimestamp(timestamp)
-            time_str = dt.strftime("%H:%M")
-            date_str = dt.strftime("%d.%m.")
-
-            # --- POŠILJALAC ---
-            headers = payload.get('headers', [])
-            sender_full = next((h['value'] for h in headers if h['name'].lower() == 'from'), "Unknown")
             
-            # Provjera da li je poruka od nas
+            sender_full = next((h['value'] for h in headers if h['name'].lower() == 'from'), "Unknown")
             is_me = current_user.email.lower() in sender_full.lower()
 
             thread_data.append({
                 "sender": sender_full,
                 "body": body,
                 "is_me": is_me,
-                "time": time_str,
-                "date": date_str
+                "time": dt.strftime("%H:%M"),
+                "date": dt.strftime("%d.%m.")
             })
-
         return thread_data
     except Exception as e:
-        print(f"Error fetching thread: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Thread Error: {str(e)}")
+
+@router.get("/history")
+async def get_campaign_history(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    return db.query(Campaign).filter(Campaign.user_id == current_user.id).order_by(Campaign.created_at.desc()).all()
