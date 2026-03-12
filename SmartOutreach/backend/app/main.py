@@ -10,7 +10,7 @@ from .controller.dashboard.leads import router as leads_router
 from .controller.campaigns.campaigns import router as campaigns_router
  
 # 1. Učitaj enviroment varijable iz .env fajla
-load_dotenv()
+load_dotenv() 
 
 # 2. Kreiraj tabele u bazi ako ne postoje (automatska migracija)
 Base.metadata.create_all(bind=engine)  

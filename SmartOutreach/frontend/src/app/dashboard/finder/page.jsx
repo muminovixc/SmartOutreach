@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import Sidebar from '../../../../components/sidebar';
 import LeadForm from '../../../../components/dashboard/leadForm';
 import LeadCard from '../../../../components/dashboard/LeadCard';
+import Footer from '../../../../components/footer';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function LeadFinderPage() {
@@ -65,10 +66,13 @@ export default function LeadFinderPage() {
               )}
             </AnimatePresence>
           </div>
+          
         </div>
+        <Footer></Footer>
       </main>
 
       <div className="fixed top-0 right-0 w-[500px] h-[500px] bg-[#00F5D4]/5 blur-[120px] -z-10 rounded-full" />
+      
     </div>
   );
 }
