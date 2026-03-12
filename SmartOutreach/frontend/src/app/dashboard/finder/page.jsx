@@ -52,7 +52,7 @@ export default function LeadFinderPage() {
           <div className="flex items-center gap-4 mb-6">
             <h2 className="text-xs font-black uppercase tracking-[0.3em] text-zinc-600">Results</h2>
             <div className="h-[1px] flex-1 bg-zinc-900" />
-            <span className="text-[10px] font-bold text-zinc-800">{results.length} leads found</span>
+            <span className="text-[10px] font-bold text-zinc-800">{results.length} leads found </span>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
