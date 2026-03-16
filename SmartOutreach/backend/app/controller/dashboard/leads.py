@@ -10,6 +10,9 @@ from app.schemas.leads import EmailGenerationRequest
 import os
 from dotenv import load_dotenv
 from app.services.dashboard.lead_services import scrape_lead_info
+from app.services.auth import get_current_user
+from app.models.users import User
+from app.models.campaigns import Campaign
 
 router = APIRouter(prefix="/leads", tags=["Leads"])
 genai.configure(api_key=os.environ.get("GEMINI_KEY"))  # Gemini API key
@@ -121,3 +124,65 @@ async def generate_personalized_email(request: EmailGenerationRequest):
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+@router.get("/stats")
+async def get_campaign_stats(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    # Ukupan broj kampanja korisnika
+    total = db.query(Campaign).filter(Campaign.user_id == current_user.id).count()
+    
+    # Broj onih koji su odgovorili
+    replied = db.query(Campaign).filter(
+        Campaign.user_id == current_user.id, 
+        Campaign.status == "replied"
+    ).count()
+
+    # Izračunaj procenat
+    response_rate = (replied / total * 100) if total > 0 else 0
+
+    return {
+        "total_outreach": total,
+        "replied_count": replied,
+        "response_rate": f"{round(response_rate, 2)}%",
+        "pending_followups": total - replied
+    }
+
+
+from datetime import datetime
+
+@router.get("/activity")
+async def get_recent_activity(
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
+    # Uzimamo zadnjih 5 kampanja koje su ažurirane
+    # Pretpostavljam da imaš 'updated_at' ili sličnu kolonu
+    recent_campaigns = db.query(Campaign).filter(
+        Campaign.user_id == current_user.id
+    ).order_by(Campaign.id.desc()).limit(5).all()
+
+    activity_log = []
+    
+    for camp in recent_campaigns:
+        # Logika za opis akcije na osnovu statusa
+        action = "Email Sent"
+        status_label = "Initial"
+        
+        if camp.status == "replied":
+            action = "Received Reply"
+            status_label = "Interested"
+        elif camp.status == "followup":
+            action = "Follow-up Sent"
+            status_label = "Pending"
+
+        # Formatiranje vremena (npr. "2m ago")
+        # Za pravu "ago" funkciju treba ti helper, ovdje šaljemo ISO format
+        activity_log.append({
+            "id": camp.id,
+            "name": camp.target_email.split('@')[0].capitalize(), # Ili camp.company_name ako imaš
+            "action": action,
+            "time": datetime.utcnow().isoformat(),
+            "status": status_label
+        })
+
+    return activity_log
