@@ -13,7 +13,7 @@ import os
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def create_user(db: Session, user_data: UserCreate):
-    # Hashing lozinke
+ 
     hashed_password = pwd_context.hash(user_data.password)
     
     db_user = User(
@@ -22,7 +22,7 @@ def create_user(db: Session, user_data: UserCreate):
         surname=user_data.surname,
         number=user_data.number,
         company_name=user_data.company_name,
-        hashed_password=hashed_password # Dodaj ovo polje u model ako već nisi
+        hashed_password=hashed_password 
     )
     
     db.add(db_user) 
@@ -66,17 +66,17 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     try:
-        # 1. Dekodiranje koristeći tvoj tajni ključ
+       
         payload = jwt.decode(token, os.getenv("SECRET_KEY"), algorithms=["HS256"])
         
-        # 2. Uzimanje ID-a iz "sub" polja (tvoj token ga ima, vidim iz debuga)
+        
         user_id: str = payload.get("sub")
         
         if user_id is None:
             print("DEBUG: 'sub' polje nije pronađeno u tokenu")
             raise HTTPException(status_code=401, detail="Invalid token payload")
 
-        # 3. Pronalazak korisnika (BITNO: Cast-uj string u UUID ako treba)
+       
         user = db.query(User).filter(User.id == user_id).first()
         
         if user is None:

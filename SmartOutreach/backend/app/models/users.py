@@ -7,7 +7,6 @@ class User(Base):
     __tablename__ = "users"
     __table_args__ = {"schema": "public"}
 
-    # Primarni ključ: UUID generisan na strani baze ili aplikacije
     id = Column(
         UUID(as_uuid=True), 
         primary_key=True, 
@@ -24,16 +23,12 @@ class User(Base):
     google_access_token = Column(String, nullable=True)
     google_refresh_token = Column(String, nullable=True)
     google_token_expires_at = Column(DateTime, nullable=True)
-    is_active = Column(Integer, default=1)  # 1 za aktivne korisnike, 0 za neaktivne
-
-    # Automatsko računanje vremena na serveru (UTC)
+    is_active = Column(Integer, default=1) 
     created_at = Column(
         DateTime(timezone=True), 
         server_default=text("timezone('utc'::text, now())"),  
         nullable=False
     )
-    
-    # Veza sa Supabase Auth sistemom (nasumični ID iz auth.users tabele)
     auth_user_id = Column(UUID(as_uuid=True), unique=True, nullable=True)
 
     def __repr__(self):

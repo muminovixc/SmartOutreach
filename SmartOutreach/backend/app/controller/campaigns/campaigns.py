@@ -45,12 +45,12 @@ async def sync_all_campaigns(
     if not campaigns_to_check:
         return {"status": "success", "message": "No campaigns to sync."}
 
-    # Prosleđujemo user_id i ID-eve kampanja umjesto cijelih objekata da izbjegnemo DetachedInstanceError
+   
     user_id = current_user.id
     campaign_ids = [c.id for c in campaigns_to_check]
 
     def check_threads_task(u_id: str, c_ids: List[int]):
-        # Background task treba svoju sesiju
+        
         new_db = next(get_db())
         user = new_db.query(User).filter(User.id == u_id).first()
         service = _get_google_service(user, new_db)

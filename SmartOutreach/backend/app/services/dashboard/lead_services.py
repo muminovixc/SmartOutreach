@@ -22,7 +22,7 @@ def search_google_maps(niche: str, city: str):
     search = GoogleSearch(params)
     results = search.get_dict()
     
-    # Izvlačimo samo bitne podatke iz gomile rezultata
+    
     local_results = results.get("local_results", [])
     
     leads = []
@@ -58,18 +58,17 @@ async def scrape_lead_info(url: str):
             
             soup = BeautifulSoup(response.text, 'html.parser')
             
-            # 1. Pronalaženje emaila
+            
             email_regex = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
             emails = re.findall(email_regex, response.text)
             valid_emails = [e for e in emails if not e.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.svg'))]
             found_email = valid_emails[0] if valid_emails else "no email"
 
-            # 2. Izvlačenje teksta (samo bitni dijelovi da ne preopteretimo prompt)
-            # Brišemo skripte i stilove
+           
             for script in soup(["script", "style"]):
                 script.decompose()
             
-            # Uzimamo prvih 2000 karaktera teksta (obično dovoljno za About/Hero sekciju)
+            
             text_content = soup.get_text(separator=' ', strip=True)[:2000]
             
             return found_email, text_content

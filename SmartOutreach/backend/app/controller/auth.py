@@ -22,7 +22,7 @@ from ..services.auth import (
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
-# REGISTRACIJA I LOGIN ---
+# REGISTRACIJA I LOGIN
 
 @router.post("/register", response_model=UserResponse)
 def register(user: UserCreate, db: Session = Depends(get_db)):
@@ -81,12 +81,12 @@ async def google_login():
     flow = Flow.from_client_config(client_config, scopes=SCOPES)
     flow.redirect_uri = REDIRECT_URI
     
-    # KLJUČNO: Onemogućavamo PKCE (code_challenge) ovdje
+    
     authorization_url, state = flow.authorization_url(
         access_type='offline',
         include_granted_scopes='true',
         prompt='consent',
-        code_challenge=None  # <--- DODAJ OVO
+        code_challenge=None  
     )
     return RedirectResponse(authorization_url)
 
@@ -94,8 +94,7 @@ async def google_login():
 @router.get("/google/callback")
 async def google_callback(code: str, db: Session = Depends(get_db)):
     token_url = "https://oauth2.googleapis.com/token"
-    
-    # 1. Razmjena autorizacijskog koda za tokene
+
     data = {
         "code": code,
         "client_id": GOOGLE_CLIENT_ID,
@@ -114,14 +113,12 @@ async def google_callback(code: str, db: Session = Depends(get_db)):
             detail=f"Google Error: {token_data.get('error_description')}"
         )
 
-    # 2. Dekodiranje ID tokena (Bypass clock error)
+   
     try:
         id_token_raw = token_data.get("id_token")
-        # Koristimo verify=False za exp/iat provjeru jer ti sat pravi probleme,
-        # ali Google je već potvrdio autentičnost kroz code exchange.
         id_info = google_jwt.decode(id_token_raw, verify=False)
         
-        # Sigurnosna provjera: Da li je token namijenjen tvojoj aplikaciji?
+        
         if id_info.get("aud") != GOOGLE_CLIENT_ID:
             raise HTTPException(status_code=400, detail="Audience mismatch.")
             
@@ -133,40 +130,38 @@ async def google_callback(code: str, db: Session = Depends(get_db)):
         print(f"Token Decode Error: {e}")
         raise HTTPException(status_code=400, detail="Failed to decode Google identity.")
 
-    # 3. Rad sa bazom podataka (User Check/Create)
+
     user = db.query(User).filter(User.email == email).first()
     
     if not user:
-        # Kreiramo novog korisnika ako ne postoji
+        
         user = User(
             email=email, 
             name=id_info.get('given_name', ''), 
             surname=id_info.get('family_name', ''), 
-            hashed_password="", # Google korisnici nemaju lokalni password
+            hashed_password="", 
             is_active=1
         )
         db.add(user)
-        db.flush() # Dobijamo user.id prije commita
+        db.flush() 
 
-    # 4. Ažuriranje Google tokena u bazi
+ 
     user.google_access_token = token_data.get("access_token")
     
-    # Refresh token dolazi samo prvi put kada se korisnik prijavi (ili ako dodaš prompt=consent)
+    
     refresh_token = token_data.get("refresh_token")
     if refresh_token:
         user.google_refresh_token = refresh_token
     
-    # Izračunavanje isteka (opcionalno, ali korisno)
+    
     expires_in = token_data.get("expires_in", 3600)
     user.google_token_expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
     
     db.commit()
 
-    # 5. Kreiranje tvog internog JWT-a za Frontend
+    
     my_jwt = create_access_token(data={"sub": str(user.id), "email": user.email})
     
-    # 6. Redirect na Frontend sa podacima
-    # Preporuka: U produkciji šalji samo token, a ostalo dohvati preko /me endpointa
     frontend_url = (
         f"http://localhost:3000/dashboard"
         f"?token={my_jwt}"

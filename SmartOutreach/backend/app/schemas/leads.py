@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import Optional
 
 class LeadCreate(BaseModel):
-    user_id: str  # Assuming user_id is a string UUID (as in frontend)
+    user_id: str  
     business_name: str
     business_category: Optional[str] = None
     address: Optional[str] = None
@@ -20,11 +20,11 @@ class CompanyRequest(BaseModel):
 
 class EmailGenerationRequest(BaseModel):
     website_url: str
-    service_offered: str  # npr. "Web Design", "SEO", "AI Automations"
+    service_offered: str  
     company_name: str
     language: Optional[str] = "English"
-    sender_name: Optional[str] = None  # Ime osobe kojoj se obraća, ako je poznato
-    company_name: Optional[str] = None  # Naziv kompanije kojoj se obraća, ako je poznato
+    sender_name: Optional[str] = None  
+    company_name: Optional[str] = None 
 
 
 class EmailSendRequest(BaseModel):

@@ -14,12 +14,11 @@ class Campaign(Base):
     subject = Column(Text, nullable=False)
     content = Column(Text, nullable=False)
     
-    # IZMJENA: Spremamo thread_id za praćenje odgovora
+    
     thread_id = Column(String(255), index=True) 
     
-    # Statusi: 'sent', 'replied', 'failed'
+  
     status = Column(String(50), default="sent")
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    # Opciono: Pratimo kada smo zadnji put provjerili Gmail API
     last_checked = Column(DateTime(timezone=True), onupdate=func.now())

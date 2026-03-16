@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 from app.services.dashboard.lead_services import scrape_lead_info
 
 router = APIRouter(prefix="/leads", tags=["Leads"])
-genai.configure(api_key=os.environ.get("GEMINI_KEY"))  # Postavi GEMINI_KEY iz .env datoteke
+genai.configure(api_key=os.environ.get("GEMINI_KEY"))  # Gemini API key
 
 
 @router.get("/search")
@@ -28,7 +28,7 @@ async def get_leads(niche: str, city: str):
 @router.post("/save")
 async def save_lead(lead_data: LeadCreate, db: Session = Depends(get_db)):
     try:
-        # MAPIRAJ POLJA RUČNO (Sigurnije i izbjegava dupliranje)
+        
         new_lead = SavedLead(
             user_id=lead_data.user_id,
             business_name=lead_data.business_name,
@@ -41,7 +41,6 @@ async def save_lead(lead_data: LeadCreate, db: Session = Depends(get_db)):
         
         db.add(new_lead)
         db.commit()
-        print("Saved lead:", new_lead)  # Debug: provjeri koji lead je spremljen
         db.refresh(new_lead)
         return {"status": "success", "id": str(new_lead.id)}
         
@@ -52,10 +51,10 @@ async def save_lead(lead_data: LeadCreate, db: Session = Depends(get_db)):
 
 @router.get("/my-leads")
 async def get_my_leads(user_id: str, db: Session = Depends(get_db)):
-    # Filtriramo bazu tako da dobijemo samo leadove ovog korisnika
+  
     leads = db.query(SavedLead).filter(SavedLead.user_id == user_id).order_by(SavedLead.created_at.desc()).all()
     
-    # Mapiramo nazive polja da odgovaraju onome što LeadCard očekuje (title umjesto business_name)
+   
     formatted_leads = []
     for lead in leads:
         formatted_leads.append({
@@ -86,12 +85,12 @@ async def delete_lead(lead_id: str, db: Session = Depends(get_db)):
 @router.post("/generate-email")
 async def generate_personalized_email(request: EmailGenerationRequest):
     try:
-        # 1. Skupljamo info sa web sajta
+     
         found_email, website_context = await scrape_lead_info(request.website_url)
 
         model = genai.GenerativeModel("gemini-2.5-flash")
         
-        # 2. Prompt koji koristi 'website_context'
+    
         prompt = (
             f"You are a world-class sales copywriter.\n"
             f"Using the following context from the company's website, write a highly personalized cold email.\n\n"
