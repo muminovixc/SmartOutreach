@@ -17,7 +17,6 @@ export default function Sidebar() {
       icon: Search, 
       label: "Lead Finder", 
       path: "/dashboard/finder",
-      // Dodajemo subItems za podnavigaciju
       subItems: [
         { icon: Bookmark, label: "Saved Leads", path: "/dashboard/finder/myLeads" }
       ]
